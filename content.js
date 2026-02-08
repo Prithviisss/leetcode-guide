@@ -1,45 +1,73 @@
-console.log("LeetCode AI Hints extension loaded");
+console.log("LeetCode AI Hints loaded");
 
-function waitForPage() {
-  const titleEl = document.querySelector('[data-cy="question-title"]');
-  const descEl = document.querySelector('[data-track-load="description_content"]');
-
-  if (!titleEl || !descEl) {
-    setTimeout(waitForPage, 500);
-    return;
-  }
-
-  addHintButton(titleEl, descEl);
-}
-
-function addHintButton(titleEl, descEl) {
+function injectButton() {
   if (document.getElementById("ai-hint-btn")) return;
 
   const btn = document.createElement("button");
   btn.id = "ai-hint-btn";
-  btn.textContent = "Get AI Hint";
+  btn.innerText = "Get AI Hint";
 
   btn.style.position = "fixed";
-  btn.style.bottom = "20px";
-  btn.style.right = "20px";
-  btn.style.zIndex = "10000";
-  btn.style.padding = "12px 16px";
+  btn.style.bottom = "40px";
+  btn.style.right = "40px";
+  btn.style.zIndex = "2147483647"; // MAX possible
+  btn.style.padding = "14px 18px";
   btn.style.background = "#ffa116";
+  btn.style.color = "#000";
   btn.style.border = "none";
-  btn.style.borderRadius = "8px";
+  btn.style.borderRadius = "10px";
+  btn.style.fontWeight = "700";
+  btn.style.fontSize = "14px";
   btn.style.cursor = "pointer";
-  btn.style.fontWeight = "600";
+  btn.style.boxShadow = "0 10px 30px rgba(0,0,0,0.3)";
 
   btn.onclick = () => {
-    const problemTitle = titleEl.innerText.trim();
-    const problemDescription = descEl.innerText.trim();
+  chrome.runtime.sendMessage(
+    {
+      type: "GET_HINT",
+      title: document.title
+    },
+    (res) => {
+      showHint(res.hint);
+    }
+  );
+};
 
-    console.log("📘 TITLE:", problemTitle);
-    console.log("📄 DESCRIPTION:", problemDescription);
-  };
+function showHint(text) {
+  let box = document.getElementById("ai-hint-box");
+  if (box) box.remove();
+
+  box = document.createElement("div");
+  box.id = "ai-hint-box";
+  box.innerText = text;
+
+  box.style.position = "fixed";
+  box.style.bottom = "100px";
+  box.style.right = "40px";
+  box.style.zIndex = "2147483647";
+  box.style.width = "300px";
+  box.style.padding = "14px";
+  box.style.background = "#1a1a1a";
+  box.style.color = "#fff";
+  box.style.borderRadius = "10px";
+  box.style.fontSize = "13px";
+  box.style.whiteSpace = "pre-line";
+  box.style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
+
+  document.body.appendChild(box);
+}
+
 
   document.body.appendChild(btn);
 }
 
-waitForPage();
+// Wait until LeetCode REALLY settles
+let attempts = 0;
+const interval = setInterval(() => {
+  attempts++;
+  injectButton();
+
+  if (attempts > 20) clearInterval(interval);
+}, 1000);
+
 
