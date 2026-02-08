@@ -1,0 +1,6 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode AI Hints",
+  "version": "1.0",
+  "description": "AI-powered hints for LeetCode problems"
+}
