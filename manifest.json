@@ -3,11 +3,14 @@
   "name": "LeetCode AI Hints",
   "version": "1.0",
   "description": "AI-powered hints for LeetCode problems (no full solutions)",
+
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["https://leetcode.com/*"],
+
   "background": {
     "service_worker": "background.js"
   },
+
   "content_scripts": [
     {
       "matches": ["https://leetcode.com/problems/*"],
@@ -15,7 +18,9 @@
       "css": ["styles.css"]
     }
   ],
+
   "action": {
     "default_popup": "popup.html"
   }
 }
+
