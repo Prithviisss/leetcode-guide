@@ -1,67 +1,39 @@
-console.log("LeetCode AI Hints loaded");
+console.log("Content script loaded");
 
-function showHint(text) {
-  let box = document.getElementById("ai-hint-box");
-  if (box) box.remove();
+const btn = document.createElement("button");
+btn.innerText = "💡 AI Hint";
 
-  box = document.createElement("div");
-  box.id = "ai-hint-box";
-  box.innerText = text;
+btn.style.position = "fixed";
+btn.style.bottom = "20px";
+btn.style.right = "20px";
+btn.style.zIndex = "9999";
+btn.style.padding = "10px 14px";
+btn.style.borderRadius = "8px";
+btn.style.border = "none";
+btn.style.background = "#0f172a";
+btn.style.color = "white";
+btn.style.cursor = "pointer";
 
-  box.style.position = "fixed";
-  box.style.bottom = "100px";
-  box.style.right = "40px";
-  box.style.zIndex = "2147483647";
-  box.style.width = "300px";
-  box.style.padding = "14px";
-  box.style.background = "#1a1a1a";
-  box.style.color = "#fff";
-  box.style.borderRadius = "10px";
-  box.style.fontSize = "13px";
-  box.style.whiteSpace = "pre-line";
-  box.style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
+document.body.appendChild(btn);
 
-  document.body.appendChild(box);
-}
+btn.addEventListener("click", () => {
+  console.log("BUTTON CLICKED");
 
-function injectButton() {
-  if (document.getElementById("ai-hint-btn")) return;
+  // Grab ONLY the problem description
+  const problemElement = document.querySelector('.css-v3d350'); // LeetCode problem div
+  const problemText = problemElement
+    ? problemElement.innerText.slice(0, 1500) // limit to 1500 chars
+    : document.body.innerText.slice(0, 1500); // fallback
 
-  const btn = document.createElement("button");
-  btn.id = "ai-hint-btn";
-  btn.innerText = "Get AI Hint";
+  chrome.runtime.sendMessage(
+    {
+      type: "GET_HINT",
+      problem: problemText
+    },
+    (res) => {
+      console.log("RESPONSE:", res);
+      alert(res?.hint || "No response");
+    }
+  );
+});
 
-  btn.style.position = "fixed";
-  btn.style.bottom = "40px";
-  btn.style.right = "40px";
-  btn.style.zIndex = "2147483647";
-  btn.style.padding = "14px 18px";
-  btn.style.background = "#ffa116";
-  btn.style.border = "none";
-  btn.style.borderRadius = "10px";
-  btn.style.cursor = "pointer";
-  btn.style.fontWeight = "700";
-
-  btn.onclick = () => {
-    const problem = document.body.innerText.slice(0, 6000);
-
-    chrome.runtime.sendMessage(
-      {
-        type: "GET_HINT",
-        problem
-      },
-      (res) => {
-        showHint(res.hint);
-      }
-    );
-  };
-
-  document.body.appendChild(btn);
-}
-
-let tries = 0;
-const interval = setInterval(() => {
-  injectButton();
-  tries++;
-  if (tries > 20) clearInterval(interval);
-}, 1000);
