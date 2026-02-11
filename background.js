@@ -1,66 +1,53 @@
-const GEMINI_API_KEY = "AIzaSyB3huSKSuOhp3TbLN0B0OS1elOvUYSfNls";
-
-
-
-
-
-console.log("Background loaded");
+const GEMINI_API_KEY = "AIzaSyCoP4u_gkZeiJ_uCMq3PrgHZ4WPzLm1qg0";
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  console.log("Message received:", req);
-
   if (req.type === "GET_HINT") {
-    generateHint(req.problem)
+    getValidModelAndHint(req.problem)
       .then(hint => sendResponse({ hint }))
-      .catch(err => {
-        console.error("AI ERROR FULL:", err);
-        sendResponse({ hint: "AI failed" });
-      });
-
-    return true; // MUST return true for async response
+      .catch(err => sendResponse({ hint: "Error: " + err.message }));
+    return true;
   }
 });
 
-async function generateHint(problemText) {
-  const prompt = `
-You are an expert DSA tutor.
-Read the problem below and provide a concise, helpful hint.
-Do NOT provide full solution or code.
-
-Problem:
-${problemText}
-`;
-
+async function getValidModelAndHint(problemText) {
   try {
-    const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/text-bison-001:generateText?key=" + GEMINI_API_KEY,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          "prompt": prompt,
-          "temperature": 0.3,         // slightly more flexible hints
-          "maxOutputTokens": 400      // enough for a short hint
-        })
-      }
-    );
+    // STEP 1: Ask Google which models this key can actually use
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
+    const listRes = await fetch(listUrl);
+    const listData = await listRes.json();
 
-    const data = await res.json();
-    console.log("GEMINI RESPONSE:", data);
-
-    if (data?.candidates && data.candidates.length > 0) {
-      return data.candidates[0].content;
-    } else {
-      return "No hint received";
+    if (!listData.models) {
+      throw new Error("Could not list models. Check if API Key is correct.");
     }
-  } catch (err) {
-    console.error(err);
-    return "AI failed";
+
+    // STEP 2: Find the best available model (Flash 1.5, then Pro, then Flash 1.0)
+    const modelList = listData.models.map(m => m.name);
+    const preferredModels = [
+      "models/gemini-1.5-flash",
+      "models/gemini-1.5-pro",
+      "models/gemini-pro"
+    ];
+
+    let selectedModel = preferredModels.find(m => modelList.includes(m)) || modelList[0];
+
+    // STEP 3: Make the actual hint request with the model we found
+    const hintUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const response = await fetch(hintUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: "Give a short DSA hint for: " + problemText }] }]
+      })
+    });
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No hint found.";
+
+  } catch (e) {
+    throw e;
   }
 }
-
-
-
 
 
 
