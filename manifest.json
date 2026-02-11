@@ -1,8 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetCode AI Hints",
-  "version": "1.0",
-  "description": "AI-powered hints for LeetCode problems (no full solutions)",
+  "version": "1.3",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "https://leetcode.com/*",
@@ -13,11 +12,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://leetcode.com/problems/*"],
-      "js": ["content.js"]
+      "matches": ["*://*.leetcode.com/problems/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
   ]
 }
-
 
 
