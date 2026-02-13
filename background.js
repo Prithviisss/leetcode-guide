@@ -1,16 +1,17 @@
-const GEMINI_API_KEY = "AIzaSyCoP4u_gkZeiJ_uCMq3PrgHZ4WPzLm1qg0";
+const GEMINI_API_KEY = "AIzaSyBoFuVsr7jG1ybZnKapUu_9OEVBnGFtkdY";
+
+
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.type === "GET_HINT") {
     fetchHint(req.problem)
       .then(hints => sendResponse({ hints }))
-      .catch(err => sendResponse({ hints: ["Error: " + err.message] }));
+      .catch(err => sendResponse({ hints: ["Error: " + err.message, "", ""] }));
     return true; 
   }
 });
 
 async function fetchHint(problemText) {
-  // 2026 Stable Path: v1 endpoint + gemini-2.5-flash
   const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
   
   const response = await fetch(url, {
@@ -19,55 +20,36 @@ async function fetchHint(problemText) {
     body: JSON.stringify({
       contents: [{
         parts: [{ 
-          text: `Problem: ${problemText.substring(0, 1500)}\n\nAct as a DSA coach. Provide 3 short, progressive hints. Output ONLY a valid JSON array of strings. Example: ["Hint 1", "Hint 2", "Hint 3"]` 
+          text: `Problem: ${problemText.substring(0, 1000)}\n\nAct as a DSA coach. You MUST provide exactly 3 progressive hints as a JSON array of strings. 
+          Format: ["Level 1 hint", "Level 2 hint", "Level 3 hint"]
+          - Level 1: Very subtle clue.
+          - Level 2: Algorithm or approach suggestion.
+          - Level 3: Near-solution logic (but no code).` 
         }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 500,
-      },
-      // Keep safety relaxed for technical terms
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-      ]
+      }]
     })
   });
 
   const data = await response.json();
-
-  if (data.error) {
-    // If 2.5 isn't active for your specific key yet, try the absolute latest 3-flash
-    if (data.error.code === 404) return fetchLatestGemini3(problemText);
-    throw new Error(data.error.message);
-  }
-
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  
   try {
-    const jsonMatch = rawText.match(/\[.*\]/s);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : [rawText];
+    // 1. Try to find a JSON array []
+    const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed) && parsed.length >= 3) return parsed.slice(0, 3);
+      if (Array.isArray(parsed) && parsed.length > 0) return [...parsed, "Try thinking about space complexity.", "Look at constraints."];
+    }
+    
+    // 2. Fallback: If AI just gave one string, we split it by common markers
+    const fallbackHints = rawText.split(/[.!?]\s/).filter(s => s.length > 10);
+    if (fallbackHints.length >= 3) return fallbackHints.slice(0, 3);
+
+    return [rawText, "Think about the data structures involved.", "Can you optimize this with a Map or Set?"];
   } catch (e) {
-    return [rawText];
+    return ["Look at the input constraints.", "Try a brute force approach first.", "Can you use a Hash Map?"];
   }
 }
-
-// Emergency Fallback for newest Gemini 3 accounts
-async function fetchLatestGemini3(problemText) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `Provide 3 DSA hints in a JSON array for: ${problemText.substring(0, 1000)}` }] }]
-    })
-  });
-  const data = await response.json();
-  const text = data.candidates[0].content.parts[0].text;
-  const match = text.match(/\[.*\]/s);
-  return match ? JSON.parse(match[0]) : [text];
-}
-
 
 
