@@ -1,55 +1,51 @@
-const GEMINI_API_KEY = "AIzaSyBoFuVsr7jG1ybZnKapUu_9OEVBnGFtkdY";
-
+import { GEMINI_API_KEY } from "./config.js";
 
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  if (req.type === "GET_HINT") {
-    fetchHint(req.problem)
-      .then(hints => sendResponse({ hints }))
-      .catch(err => sendResponse({ hints: ["Error: " + err.message, "", ""] }));
+  if (req.type === "GET_DATA") {
+    fetchFromAI(req.problem, req.mode)
+      .then(data => sendResponse({ result: data }))
+      .catch(err => sendResponse({ result: "Error: " + err.message }));
     return true; 
   }
 });
 
-async function fetchHint(problemText) {
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+async function fetchFromAI(problemText, mode) {
+  // Using v1 stable endpoint for 2026 compatibility
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
   
+  let promptText = "";
+  if (mode === "HINTS") {
+    promptText = `Problem: ${problemText.substring(0, 1000)}\n\nProvide exactly 3 progressive hints as a JSON array of strings.`;
+  } else if (mode === "DRY_RUN") {
+    promptText = `Problem: ${problemText.substring(0, 1000)}\n\nProvide a very short Dry Run table for a small example.`;
+  } else if (mode === "COMPLEXITY") {
+    promptText = `Problem: ${problemText.substring(0, 1000)}\n\nState Time and Space complexity in Big O notation with a 1-sentence reason.`;
+  }
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{
-        parts: [{ 
-          text: `Problem: ${problemText.substring(0, 1000)}\n\nAct as a DSA coach. You MUST provide exactly 3 progressive hints as a JSON array of strings. 
-          Format: ["Level 1 hint", "Level 2 hint", "Level 3 hint"]
-          - Level 1: Very subtle clue.
-          - Level 2: Algorithm or approach suggestion.
-          - Level 3: Near-solution logic (but no code).` 
-        }]
-      }]
+      contents: [{ parts: [{ text: promptText }] }]
     })
   });
 
   const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  
-  try {
-    // 1. Try to find a JSON array []
-    const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(parsed) && parsed.length >= 3) return parsed.slice(0, 3);
-      if (Array.isArray(parsed) && parsed.length > 0) return [...parsed, "Try thinking about space complexity.", "Look at constraints."];
+
+  if (mode === "HINTS") {
+    try {
+      const match = rawText.match(/\[[\s\S]*\]/);
+      let parsed = match ? JSON.parse(match[0]) : [rawText];
+      while(parsed.length < 3) parsed.push("Think about edge cases.");
+      return parsed.slice(0, 3);
+    } catch (e) {
+      return ["Consider the input size.", "Try a brute force approach first.", "Can you optimize with a Map?"];
     }
-    
-    // 2. Fallback: If AI just gave one string, we split it by common markers
-    const fallbackHints = rawText.split(/[.!?]\s/).filter(s => s.length > 10);
-    if (fallbackHints.length >= 3) return fallbackHints.slice(0, 3);
-
-    return [rawText, "Think about the data structures involved.", "Can you optimize this with a Map or Set?"];
-  } catch (e) {
-    return ["Look at the input constraints.", "Try a brute force approach first.", "Can you use a Hash Map?"];
   }
+  return rawText;
 }
-
 

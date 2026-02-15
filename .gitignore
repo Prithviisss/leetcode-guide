@@ -1,0 +1,14 @@
+# Secrets and Keys
+.env
+config.js
+secrets.js
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+
+# Developer Tools / Node (if you use it)
+node_modules/
+dist/
+build/
+*.log
